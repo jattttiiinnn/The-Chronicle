@@ -13,15 +13,28 @@ import { ErrorState } from '../components/ui/ErrorState.jsx';
 import { SITE_CONFIG } from '../config/site.js';
 
 export default function HomePage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const pageParam = parseInt(searchParams.get('page') || '1', 10);
   const currentPage = isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
+  const isSimulatedError = searchParams.get('_error') === 'true';
+  const throttleMs = searchParams.get('_throttle');
 
   // We fetch stories for this page (limit 8 per page)
   const { data, isLoading, isError, refetch } = usePosts({
     page: currentPage,
     limit: 8,
+    _error: isSimulatedError ? 'true' : undefined,
+    _throttle: throttleMs || undefined,
   });
+
+  const handleRetry = () => {
+    if (searchParams.get('_error')) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('_error');
+      setSearchParams(nextParams, { replace: true });
+    }
+    refetch();
+  };
 
   const posts = data?.posts || [];
   const pagination = data?.pagination || { page: 1, limit: 8, total: 0, totalPages: 1 };
@@ -74,7 +87,7 @@ export default function HomePage() {
         <ErrorState
           title="Archive Unavailable"
           message="Unable to communicate with the dispatch service. Please retry."
-          onRetry={refetch}
+          onRetry={handleRetry}
         />
       )}
 

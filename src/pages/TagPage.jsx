@@ -11,15 +11,28 @@ import { ErrorState } from '../components/ui/ErrorState.jsx';
 
 export default function TagPage() {
   const { name } = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const pageParam = parseInt(searchParams.get('page') || '1', 10);
   const currentPage = isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
+  const isSimulatedError = searchParams.get('_error') === 'true';
+  const throttleMs = searchParams.get('_throttle');
 
   const { data, isLoading, isError, refetch } = usePosts({
     tag: name,
     page: currentPage,
     limit: 6,
+    _error: isSimulatedError ? 'true' : undefined,
+    _throttle: throttleMs || undefined,
   });
+
+  const handleRetry = () => {
+    if (searchParams.get('_error')) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('_error');
+      setSearchParams(nextParams, { replace: true });
+    }
+    refetch();
+  };
 
   const posts = data?.posts || [];
   const pagination = data?.pagination || { page: 1, limit: 6, total: 0, totalPages: 1 };
@@ -63,7 +76,7 @@ export default function TagPage() {
         <ErrorState
           title="Tag Index Unavailable"
           message={`Unable to retrieve stories tagged with #${name}.`}
-          onRetry={refetch}
+          onRetry={handleRetry}
         />
       )}
 

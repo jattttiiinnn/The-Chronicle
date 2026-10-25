@@ -18,11 +18,18 @@ function setStorage(key, value) {
   } catch (e) {}
 }
 
+const MOCK_VERSION = 'v3_stage3_xss';
+try {
+  const storedVersion = localStorage.getItem(STORAGE_PREFIX + 'version');
+  if (storedVersion !== MOCK_VERSION) {
+    localStorage.setItem(STORAGE_PREFIX + 'version', MOCK_VERSION);
+    localStorage.setItem(STORAGE_PREFIX + 'posts', JSON.stringify(mockPosts));
+    localStorage.setItem(STORAGE_PREFIX + 'users', JSON.stringify(mockUsers));
+    localStorage.setItem(STORAGE_PREFIX + 'comments', JSON.stringify(mockComments));
+  }
+} catch (e) {}
+
 let posts = getStorage('posts', mockPosts);
-if (posts.length < mockPosts.length) {
-  posts = [...mockPosts];
-  setStorage('posts', posts);
-}
 let users = getStorage('users', mockUsers);
 let comments = getStorage('comments', mockComments);
 let bookmarks = getStorage('bookmarks', ['post_1']);
@@ -31,13 +38,44 @@ let bookmarks = getStorage('bookmarks', ['post_1']);
  * Custom Mock Router matching Section 11
  */
 export async function handleMockRequest(config) {
-  // Simulate 120ms network latency for realism
-  await new Promise(resolve => setTimeout(resolve, 120));
-
   const url = new URL(config.url, 'http://localhost');
   const pathname = url.pathname;
   const method = (config.method || 'get').toUpperCase();
-  const searchParams = url.searchParams;
+  console.log('[Mock API]', method, pathname);
+
+  // Combine query string parameters and Axios config.params
+  const mergedParams = new URLSearchParams(url.search);
+  if (config.params) {
+    if (config.params instanceof URLSearchParams) {
+      for (const [key, val] of config.params.entries()) {
+        mergedParams.set(key, val);
+      }
+    } else if (typeof config.params === 'object') {
+      for (const [key, val] of Object.entries(config.params)) {
+        if (val !== undefined && val !== null) {
+          mergedParams.set(key, String(val));
+        }
+      }
+    }
+  }
+
+  // Throttle simulation support
+  const throttleMs = parseInt(mergedParams.get('_throttle') || '0', 10);
+  const latency = throttleMs > 0 ? throttleMs : 120;
+  await new Promise(resolve => setTimeout(resolve, latency));
+
+  // Simulated error support
+  if (mergedParams.get('_error') === 'true' || config.headers?.['X-Mock-Error'] === 'true') {
+    const error = new Error('Simulated upstream gateway transmission failure.');
+    error.response = {
+      data: { message: 'Simulated upstream gateway transmission failure.' },
+      status: 500,
+      statusText: 'Internal Server Error',
+      headers: {},
+      config
+    };
+    throw error;
+  }
 
   // Extract auth token
   const authHeader = config.headers?.Authorization || config.headers?.authorization;
@@ -104,12 +142,12 @@ export async function handleMockRequest(config) {
   // --- POSTS ENDPOINTS ---
   // GET /api/posts?page=&category=&tag=&search=
   if (pathname === '/api/posts' && method === 'GET') {
-    const page = parseInt(searchParams.get('page') || '1', 10);
-    const limit = parseInt(searchParams.get('limit') || '6', 10);
-    const category = searchParams.get('category')?.toLowerCase();
-    const tag = searchParams.get('tag')?.toLowerCase();
-    const search = searchParams.get('search')?.toLowerCase();
-    const status = searchParams.get('status');
+    const page = parseInt(mergedParams.get('page') || '1', 10);
+    const limit = parseInt(mergedParams.get('limit') || '8', 10);
+    const category = mergedParams.get('category')?.toLowerCase().trim();
+    const tag = mergedParams.get('tag')?.toLowerCase().trim().replace(/^#/, '');
+    const search = mergedParams.get('search')?.toLowerCase().trim();
+    const status = mergedParams.get('status');
 
     let filtered = [...posts];
 
@@ -122,19 +160,24 @@ export async function handleMockRequest(config) {
     }
 
     if (category) {
-      filtered = filtered.filter(p => p.categories.some(c => c.toLowerCase() === category));
+      filtered = filtered.filter(p =>
+        p.categories && p.categories.some(c => c.toLowerCase() === category)
+      );
     }
 
     if (tag) {
-      filtered = filtered.filter(p => p.tags.some(t => t.toLowerCase() === tag));
+      filtered = filtered.filter(p =>
+        p.tags && p.tags.some(t => t.toLowerCase() === tag)
+      );
     }
 
     if (search) {
-      filtered = filtered.filter(p =>
-        p.title.toLowerCase().includes(search) ||
-        p.excerpt.toLowerCase().includes(search) ||
-        p.content.toLowerCase().includes(search)
-      );
+      filtered = filtered.filter(p => {
+        const titleMatch = p.title && p.title.toLowerCase().includes(search);
+        const excerptMatch = p.excerpt && p.excerpt.toLowerCase().includes(search);
+        const tagsMatch = p.tags && p.tags.some(t => t.toLowerCase().includes(search));
+        return Boolean(titleMatch || excerptMatch || tagsMatch);
+      });
     }
 
     // Sort by publication date descending
@@ -166,10 +209,21 @@ export async function handleMockRequest(config) {
     const slugOrId = singlePostMatch[1];
     const post = posts.find(p => p.slug === slugOrId || p.id === slugOrId);
     if (!post) return errorResponse('Post not found', 404);
+
+    // Unpublished access control:
+    // If post is not published, only the post author or an admin can view it!
+    if (post.status !== 'published') {
+      const isOwner = currentUser && currentUser.id === post.authorId;
+      const isAdmin = currentUser && currentUser.role === 'admin';
+      if (!isOwner && !isAdmin) {
+        return errorResponse('Post not found', 404);
+      }
+    }
+
     const author = users.find(u => u.id === post.authorId);
     return jsonResponse({
       ...post,
-      author: author || { name: 'Unknown Author' }
+      author: author || { name: 'Editorial Desk', bio: 'Chronicle Staff Writer' }
     });
   }
 

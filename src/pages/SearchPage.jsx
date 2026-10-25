@@ -41,12 +41,26 @@ export default function SearchPage() {
     }
   }, [debouncedQuery, searchParams, setSearchParams]);
 
+  const isSimulatedError = searchParams.get('_error') === 'true';
+  const throttleMs = searchParams.get('_throttle');
+
   // Query posts matching urlQuery and currentPage
   const { data, isLoading, isError, refetch } = usePosts({
     search: urlQuery,
     page: currentPage,
     limit: 6,
+    _error: isSimulatedError ? 'true' : undefined,
+    _throttle: throttleMs || undefined,
   });
+
+  const handleRetry = () => {
+    if (searchParams.get('_error')) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('_error');
+      setSearchParams(nextParams, { replace: true });
+    }
+    refetch();
+  };
 
   const posts = data?.posts || [];
   const pagination = data?.pagination || { page: 1, limit: 6, total: 0, totalPages: 1 };
@@ -123,7 +137,7 @@ export default function SearchPage() {
         <ErrorState
           title="Search Disrupted"
           message="An error interrupted the index lookup. Please try again."
-          onRetry={refetch}
+          onRetry={handleRetry}
         />
       )}
 
