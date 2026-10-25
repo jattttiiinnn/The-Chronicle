@@ -1,11 +1,11 @@
 import React from 'react';
-import { BrowserRouter } from 'react-router-dom';
+import { RouterProvider } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
-import { AppRoutes } from './routes/AppRoutes.jsx';
+import { router } from './routes/AppRoutes.jsx';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,9 +24,7 @@ export function App() {
         <ThemeProvider>
           <AuthProvider>
             <ToastProvider>
-              <BrowserRouter>
-                <AppRoutes />
-              </BrowserRouter>
+              <RouterProvider router={router} />
             </ToastProvider>
           </AuthProvider>
         </ThemeProvider>

@@ -44,6 +44,10 @@ export function MarkdownRenderer({ content = '', headings = [] }) {
     // Paragraphs with drop-cap on first paragraph only
     p: ({ node, children, ...props }) => {
       const isFirstParagraph = !startsWithHeadingOrImage && (node?.position?.start?.line === 1);
+      const containsImage = node?.children?.some((child) => child.tagName === 'img');
+      if (containsImage) {
+        return <div className="my-6">{children}</div>;
+      }
 
       return (
         <p

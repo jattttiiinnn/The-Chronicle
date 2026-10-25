@@ -139,23 +139,37 @@ export async function handleMockRequest(config) {
   }
 
   // --- POSTS ENDPOINTS ---
-  // GET /api/posts?page=&category=&tag=&search=
+  // GET /api/posts?page=&category=&tag=&search=&status=&authorId=&sort=
   if (pathname === '/api/posts' && method === 'GET') {
     const page = parseInt(mergedParams.get('page') || '1', 10);
     const limit = parseInt(mergedParams.get('limit') || '8', 10);
     const category = mergedParams.get('category')?.toLowerCase().trim();
     const tag = mergedParams.get('tag')?.toLowerCase().trim().replace(/^#/, '');
     const search = mergedParams.get('search')?.toLowerCase().trim();
-    const status = mergedParams.get('status');
+    const status = mergedParams.get('status')?.toLowerCase().trim();
+    const authorId = mergedParams.get('authorId');
+    const sort = mergedParams.get('sort')?.toLowerCase().trim();
 
     let filtered = [...posts];
 
-    // Status filter (default to published for public queries)
-    if (status) {
+    // Author filter (for Dashboard or Author profile)
+    if (authorId) {
+      filtered = filtered.filter(p => p.authorId === authorId);
+    }
+
+    // Status filter
+    if (status && status !== 'all') {
       filtered = filtered.filter(p => p.status === status);
-    } else {
-      // By default, public list only shows published
-      filtered = filtered.filter(p => p.status === 'published');
+    } else if (!status && !authorId) {
+      // Public feed: only published posts or scheduled posts whose publish time has arrived
+      const now = new Date().getTime();
+      filtered = filtered.filter(p => {
+        if (p.status === 'published') return true;
+        if (p.status === 'scheduled' && p.publishAt && new Date(p.publishAt).getTime() <= now) {
+          return true;
+        }
+        return false;
+      });
     }
 
     if (category) {
@@ -179,12 +193,23 @@ export async function handleMockRequest(config) {
       });
     }
 
-    // Sort by publication date descending
-    filtered.sort((a, b) => {
-      const dateA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
-      const dateB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
-      return dateB - dateA;
-    });
+    // Sorting
+    if (sort === 'views') {
+      filtered.sort((a, b) => (b.views || 0) - (a.views || 0));
+    } else if (sort === 'oldest') {
+      filtered.sort((a, b) => {
+        const dateA = new Date(a.publishedAt || a.publishAt || a.createdAt || 0).getTime();
+        const dateB = new Date(b.publishedAt || b.publishAt || b.createdAt || 0).getTime();
+        return dateA - dateB;
+      });
+    } else {
+      // Default: newest first
+      filtered.sort((a, b) => {
+        const dateA = new Date(a.publishedAt || a.publishAt || a.createdAt || 0).getTime();
+        const dateB = new Date(b.publishedAt || b.publishAt || b.createdAt || 0).getTime();
+        return dateB - dateA;
+      });
+    }
 
     const total = filtered.length;
     const totalPages = Math.ceil(total / limit) || 1;
@@ -202,16 +227,33 @@ export async function handleMockRequest(config) {
     });
   }
 
-  // GET /api/posts/:slug
+  // GET /api/posts/:slugOrId
   const singlePostMatch = pathname.match(/^\/api\/posts\/([^/]+)$/);
   if (singlePostMatch && method === 'GET') {
     const slugOrId = singlePostMatch[1];
-    const post = posts.find(p => p.slug === slugOrId || p.id === slugOrId);
+    // First try exact ID match (author/admin editor lookup)
+    const isIdQuery = slugOrId.startsWith('post_');
+    const post = posts.find(p => isIdQuery ? p.id === slugOrId : (p.slug === slugOrId || p.id === slugOrId));
     if (!post) return errorResponse('Post not found', 404);
 
-    // Unpublished access control:
-    // If post is not published, only the post author or an admin can view it!
-    if (post.status !== 'published') {
+    // If fetched by ID (editor flow), verify author ownership or admin role
+    if (isIdQuery) {
+      if (!currentUser || (currentUser.role !== 'admin' && post.authorId !== currentUser.id)) {
+        return errorResponse('Forbidden: You can only edit your own posts', 403);
+      }
+      const author = users.find(u => u.id === post.authorId);
+      return jsonResponse({
+        ...post,
+        author: author || { name: 'Editorial Desk', bio: 'Chronicle Staff Writer' }
+      });
+    }
+
+    // Public slug-based lookup: check draft & future-scheduled permissions
+    const now = new Date().getTime();
+    const isFutureScheduled = post.status === 'scheduled' && post.publishAt && new Date(post.publishAt).getTime() > now;
+    const isDraft = post.status === 'draft';
+
+    if (isDraft || isFutureScheduled) {
       const isOwner = currentUser && currentUser.id === post.authorId;
       const isAdmin = currentUser && currentUser.role === 'admin';
       if (!isOwner && !isAdmin) {
@@ -285,19 +327,31 @@ export async function handleMockRequest(config) {
       return errorResponse('Unauthorized to create posts', 403);
     }
     const body = typeof config.data === 'string' ? JSON.parse(config.data || '{}') : config.data || {};
+    const slug = body.slug || (body.title ? body.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') : `story-${Date.now()}`);
+
+    // Check slug conflict
+    if (posts.some(p => p.slug === slug)) {
+      return errorResponse({
+        message: `Slug taken, try ${slug}-2`,
+        conflict: true,
+        suggestedSlug: `${slug}-2`
+      }, 409);
+    }
+
     const newPost = {
       id: `post_${Date.now()}`,
       authorId: currentUser.id,
-      title: body.title,
-      slug: body.slug || body.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      title: body.title || 'Untitled',
+      slug,
       content: body.content || '',
       excerpt: body.excerpt || '',
       coverUrl: body.coverUrl || '',
       categories: body.categories || [],
       tags: body.tags || [],
       status: body.status || 'draft',
+      publishAt: body.status === 'scheduled' ? body.publishAt : null,
       featured: false,
-      publishedAt: body.status === 'published' ? new Date().toISOString() : body.publishedAt || null,
+      publishedAt: body.status === 'published' ? new Date().toISOString() : null,
       views: 0,
       likes: []
     };
@@ -316,9 +370,24 @@ export async function handleMockRequest(config) {
       return errorResponse('Forbidden', 403);
     }
     const body = typeof config.data === 'string' ? JSON.parse(config.data || '{}') : config.data || {};
+
+    // Check slug conflict on update
+    if (body.slug && body.slug !== post.slug) {
+      if (posts.some(p => p.id !== id && p.slug === body.slug)) {
+        return errorResponse({
+          message: `Slug taken, try ${body.slug}-2`,
+          conflict: true,
+          suggestedSlug: `${body.slug}-2`
+        }, 409);
+      }
+    }
+
     Object.assign(post, body);
     if (body.status === 'published' && !post.publishedAt) {
       post.publishedAt = new Date().toISOString();
+    }
+    if (body.status !== 'scheduled') {
+      post.publishAt = null;
     }
     setStorage('posts', posts);
     return jsonResponse(post);
@@ -341,8 +410,34 @@ export async function handleMockRequest(config) {
   // POST /api/uploads/image
   if (pathname === '/api/uploads/image' && method === 'POST') {
     if (!currentUser) return errorResponse('Unauthorized', 401);
-    // In mock, return simulated Cloudinary / S3 URL and public_id
+
+    // Validate uploaded file if present in FormData
+    const formData = config.data;
+    if (formData && typeof formData.get === 'function') {
+      const file = formData.get('image');
+      if (file) {
+        const name = (file.name || '').toLowerCase();
+        const type = (file.type || '').toLowerCase();
+
+        // Strictly reject SVG and non-images
+        if (name.endsWith('.svg') || type.includes('svg') || (!type.startsWith('image/') && type !== '')) {
+          return errorResponse('Invalid file type. SVG and non-images are strictly prohibited.', 400);
+        }
+
+        // Validate allowed MIME types: jpeg, png, webp
+        if (type && !['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(type)) {
+          return errorResponse('Invalid image format. Allowed formats: JPEG, PNG, WebP.', 400);
+        }
+
+        // Size limit: 5 MB (5 * 1024 * 1024 bytes)
+        if (file.size && file.size > 5 * 1024 * 1024) {
+          return errorResponse('File size exceeds the 5MB maximum limit.', 400);
+        }
+      }
+    }
+
     return jsonResponse({
+      secure_url: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=1200&q=80",
       url: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=1200&q=80",
       public_id: `img_${Date.now()}`
     }, 201);

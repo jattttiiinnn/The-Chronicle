@@ -3,7 +3,7 @@ import { apiClient } from './client.js';
 /**
  * Image upload contract
  * Endpoint: POST /api/uploads/image (multipart/form-data)
- * Response: { url, public_id }
+ * Response: { secure_url, url, public_id }
  */
 export async function uploadImage(file, onProgress) {
   const formData = new FormData();

@@ -3,8 +3,8 @@ import { apiClient } from './client.js';
 /**
  * Posts API contract
  * Endpoints:
- * - GET /api/posts?page=&category=&tag=&search=
- * - GET /api/posts/:slug
+ * - GET /api/posts?page=&category=&tag=&search=&status=&authorId=&sort=
+ * - GET /api/posts/:slugOrId
  * - POST /api/posts
  * - PUT /api/posts/:id
  * - DELETE /api/posts/:id
@@ -21,6 +21,11 @@ export async function getPosts(params = {}) {
 
 export async function getPostBySlug(slug) {
   const response = await apiClient.get(`/api/posts/${slug}`);
+  return response.data;
+}
+
+export async function getPostById(id) {
+  const response = await apiClient.get(`/api/posts/${id}`);
   return response.data;
 }
 
