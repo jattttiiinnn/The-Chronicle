@@ -71,54 +71,56 @@ export function StyleguidePage() {
             </p>
           </div>
 
-          {/* Quick Simulation Bar */}
-          <div className="bg-paper-2 p-4 border border-rule rounded-[2px] flex flex-col gap-3">
-            <span className="font-mono text-[0.6875rem] uppercase tracking-meta text-ink-soft">
-              Simulation Controls
-            </span>
-            <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
-              <span className="text-ink">Theme:</span>
-              <button
-                type="button"
-                onClick={() => setTheme('light')}
-                className={`px-2 py-1 border rounded-[2px] ${theme === 'light' ? 'bg-ink text-paper border-ink' : 'border-rule text-ink'}`}
-              >
-                Paper (Light)
-              </button>
-              <button
-                type="button"
-                onClick={() => setTheme('dark')}
-                className={`px-2 py-1 border rounded-[2px] ${theme === 'dark' ? 'bg-ink text-paper border-ink' : 'border-rule text-ink'}`}
-              >
-                Night Paper (Dark)
-              </button>
-              <button
-                type="button"
-                onClick={() => setTheme('system')}
-                className={`px-2 py-1 border rounded-[2px] ${theme === 'system' ? 'bg-ink text-paper border-ink' : 'border-rule text-ink'}`}
-              >
-                System
-              </button>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs font-mono pt-2 border-t border-rule">
-              <span className="text-ink">Role:</span>
-              {['guest', 'reader', 'author', 'admin'].map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => switchMockRole(r)}
-                  className={`px-2 py-0.5 border rounded-[2px] uppercase text-[0.6875rem] ${
-                    role === r ? 'bg-accent text-white border-accent' : 'border-rule text-ink hover:border-ink'
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
-              <span className="text-ink-soft text-[0.6875rem] ml-1">
-                (Active: {user?.name || 'Unauthenticated Guest'})
+          {/* Quick Simulation Bar (Development Only) */}
+          {import.meta.env.DEV && (
+            <div className="bg-paper-2 p-4 border border-rule rounded-[2px] flex flex-col gap-3">
+              <span className="font-mono text-[0.6875rem] uppercase tracking-meta text-ink-soft">
+                Simulation Controls (DEV ONLY)
               </span>
+              <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
+                <span className="text-ink">Theme:</span>
+                <button
+                  type="button"
+                  onClick={() => setTheme('light')}
+                  className={`px-2 py-1 border rounded-[2px] ${theme === 'light' ? 'bg-ink text-paper border-ink' : 'border-rule text-ink'}`}
+                >
+                  Paper (Light)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTheme('dark')}
+                  className={`px-2 py-1 border rounded-[2px] ${theme === 'dark' ? 'bg-ink text-paper border-ink' : 'border-rule text-ink'}`}
+                >
+                  Night Paper (Dark)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTheme('system')}
+                  className={`px-2 py-1 border rounded-[2px] ${theme === 'system' ? 'bg-ink text-paper border-ink' : 'border-rule text-ink'}`}
+                >
+                  System
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs font-mono pt-2 border-t border-rule">
+                <span className="text-ink">Role:</span>
+                {['guest', 'reader', 'author', 'admin'].map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => switchMockRole(r)}
+                    className={`px-2 py-0.5 border rounded-[2px] uppercase text-[0.6875rem] ${
+                      role === r ? 'bg-accent text-white border-accent' : 'border-rule text-ink hover:border-ink'
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+                <span className="text-ink-soft text-[0.6875rem] ml-1">
+                  (Active: {user?.name || 'Unauthenticated Guest'})
+                </span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </section>
 
