@@ -15,26 +15,28 @@ export function TableOfContents({ headings = [] }) {
   useEffect(() => {
     if (headings.length === 0) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        // Find visible heading nearest top
-        const visible = entries.filter((entry) => entry.isIntersecting);
-        if (visible.length > 0) {
-          setActiveId(visible[0].target.id);
+    const handleScroll = () => {
+      // Find the heading that is closest to or just above the reading line (top: 140px)
+      const headingElements = headings
+        .map(({ id }) => ({ id, el: document.getElementById(id) }))
+        .filter(({ el }) => el !== null);
+
+      for (let i = headingElements.length - 1; i >= 0; i--) {
+        const { id, el } = headingElements[i];
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= 140) {
+          setActiveId(id);
+          return;
         }
-      },
-      {
-        rootMargin: '0px 0px -60% 0px',
-        threshold: [0, 1.0],
       }
-    );
+      if (headingElements.length > 0) {
+        setActiveId(headingElements[0].id);
+      }
+    };
 
-    headings.forEach(({ id }) => {
-      const el = document.getElementById(id);
-      if (el) observer.observe(el);
-    });
-
-    return () => observer.disconnect();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
   }, [headings]);
 
   if (headings.length === 0) {
@@ -103,8 +105,8 @@ export function TableOfContents({ headings = [] }) {
       </div>
 
       {/* Desktop Sticky Sidebar (>=1280px) in left margin */}
-      <aside className="hidden xl:block absolute -left-[17.5rem] top-0 w-48">
-        <div className="sticky top-24 space-y-3">
+      <aside className="hidden xl:block absolute right-full mr-8 top-0 bottom-0 w-48 pointer-events-none">
+        <div className="sticky top-20 space-y-3 pointer-events-auto">
           <p className="font-mono text-[0.6875rem] uppercase tracking-meta text-ink-soft pb-1 border-b border-rule font-semibold">
             Contents
           </p>

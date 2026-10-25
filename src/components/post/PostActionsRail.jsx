@@ -22,6 +22,11 @@ export function PostActionsRail({ post }) {
     Boolean(user && (post.likes || []).includes(user.id))
   );
 
+  useEffect(() => {
+    setLikes(post.likes || []);
+    setHasLiked(Boolean(user && (post.likes || []).includes(user.id)));
+  }, [post.likes, user]);
+
   const [hasBookmarked, setHasBookmarked] = useState(false);
   const [guestModalOpen, setGuestModalOpen] = useState(false);
   const [guestActionName, setGuestActionName] = useState('react to');
@@ -109,14 +114,34 @@ export function PostActionsRail({ post }) {
     if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
       try {
         await navigator.share(shareData);
+        return;
       } catch (e) {
-        // user cancelled or share failed
+        // user cancelled or fallback
       }
-    } else {
-      try {
+    }
+
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(window.location.href);
+      } else {
+        const dummy = document.createElement('input');
+        dummy.value = window.location.href;
+        document.body.appendChild(dummy);
+        dummy.select();
+        document.execCommand('copy');
+        document.body.removeChild(dummy);
+      }
+      success('Dispatch URL copied to clipboard.');
+    } catch (e) {
+      try {
+        const dummy = document.createElement('input');
+        dummy.value = window.location.href;
+        document.body.appendChild(dummy);
+        dummy.select();
+        document.execCommand('copy');
+        document.body.removeChild(dummy);
         success('Dispatch URL copied to clipboard.');
-      } catch (e) {
+      } catch (err) {
         toastError('Failed to copy URL to clipboard.');
       }
     }
@@ -130,9 +155,9 @@ export function PostActionsRail({ post }) {
 
   return (
     <>
-      {/* Desktop Vertical Sticky Rail (>=1280px) in left margin */}
-      <aside className="hidden xl:block absolute -left-16 top-0 w-10">
-        <div className="sticky top-32 flex flex-col items-center gap-5 p-1.5 bg-paper border border-rule rounded-[2px]">
+      {/* Desktop Vertical Sticky Rail (>=1280px) in right margin */}
+      <aside className="hidden xl:block absolute left-full ml-8 top-0 bottom-0 w-12 pointer-events-none">
+        <div className="sticky top-20 flex flex-col items-center gap-4 p-1.5 bg-paper border border-rule rounded-[2px] pointer-events-auto">
           {/* Like Button */}
           <button
             type="button"

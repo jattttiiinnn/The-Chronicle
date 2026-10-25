@@ -18,7 +18,7 @@ function setStorage(key, value) {
   } catch (e) {}
 }
 
-const MOCK_VERSION = 'v3_stage3_xss';
+const MOCK_VERSION = 'v5_stage3_longform_800';
 try {
   const storedVersion = localStorage.getItem(STORAGE_PREFIX + 'version');
   if (storedVersion !== MOCK_VERSION) {
@@ -41,7 +41,6 @@ export async function handleMockRequest(config) {
   const url = new URL(config.url, 'http://localhost');
   const pathname = url.pathname;
   const method = (config.method || 'get').toUpperCase();
-  console.log('[Mock API]', method, pathname);
 
   // Combine query string parameters and Axios config.params
   const mergedParams = new URLSearchParams(url.search);

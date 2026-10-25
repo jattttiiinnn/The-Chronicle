@@ -197,7 +197,7 @@ export default function SinglePostPage() {
         <PostActionsRail post={post} />
 
         {/* Sanitized Markdown Content */}
-        <MarkdownRenderer content={post.content} />
+        <MarkdownRenderer content={post.content} headings={headings} />
 
         {/* Tags Row */}
         {post.tags && post.tags.length > 0 && (

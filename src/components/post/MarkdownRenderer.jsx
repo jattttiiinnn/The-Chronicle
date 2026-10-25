@@ -1,24 +1,21 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
-import { createHeadingIdGenerator } from '../../utils/toc.js';
+import { slugifyHeading } from '../../utils/toc.js';
 import { sanitizeUrl } from '../../utils/sanitize.js';
 import { cn } from '../../utils/cn.js';
 
-export function MarkdownRenderer({ content = '' }) {
+export function MarkdownRenderer({ content = '', headings = [] }) {
   // Check if content starts with a heading or image
   const trimmed = content.trim();
   const startsWithHeadingOrImage = trimmed.startsWith('#') || trimmed.startsWith('!');
 
-  // Stateful heading ID generator for matching DOM headings with TOC anchors
-  const headingIdGen = useMemo(() => createHeadingIdGenerator(), [content]);
-
-
   const components = {
-    // Top-level headings attach anchor IDs
+    // Top-level headings attach anchor IDs matching Table of Contents
     h2: ({ node, children, ...props }) => {
-      const text = children?.toString() || '';
-      const id = headingIdGen(text);
+      const text = node?.children?.map((c) => c.value || '').join('') || String(children || '');
+      const matched = headings.find((h) => h.level === 2 && h.title.trim().toLowerCase() === text.trim().toLowerCase());
+      const id = matched ? matched.id : slugifyHeading(text);
       return (
         <h2
           id={id}
@@ -30,8 +27,9 @@ export function MarkdownRenderer({ content = '' }) {
       );
     },
     h3: ({ node, children, ...props }) => {
-      const text = children?.toString() || '';
-      const id = headingIdGen(text);
+      const text = node?.children?.map((c) => c.value || '').join('') || String(children || '');
+      const matched = headings.find((h) => h.level === 3 && h.title.trim().toLowerCase() === text.trim().toLowerCase());
+      const id = matched ? matched.id : slugifyHeading(text);
       return (
         <h3
           id={id}
@@ -126,20 +124,23 @@ export function MarkdownRenderer({ content = '' }) {
       );
     },
 
-    // Links: Strictly sanitized protocols
+    // Links: Strictly sanitized protocols — javascript: links render as plain text (no href)
     a: ({ node, href, children, ...props }) => {
-      const safeHref = sanitizeUrl(href);
-      const isBlocked = safeHref.startsWith('#blocked');
+      const rawUrl = node?.properties?.href || node?.url || href || '';
+      const lower = String(rawUrl).trim().toLowerCase();
+      const isUnsafe =
+        !rawUrl ||
+        lower.startsWith('javascript:') ||
+        lower.startsWith('vbscript:') ||
+        (lower.startsWith('data:') && !lower.startsWith('data:image/'));
 
-      if (isBlocked) {
-        return (
-          <span
-            className="text-destructive font-mono text-xs underline decoration-dotted cursor-not-allowed"
-            title="Blocked unsafe protocol"
-          >
-            {children} [Blocked Unsafe Link]
-          </span>
-        );
+      if (isUnsafe) {
+        return <span>{children}</span>;
+      }
+
+      const safeHref = sanitizeUrl(rawUrl);
+      if (safeHref.startsWith('#blocked')) {
+        return <span>{children}</span>;
       }
 
       return (
@@ -193,6 +194,7 @@ export function MarkdownRenderer({ content = '' }) {
       <ReactMarkdown
         rehypePlugins={[rehypeHighlight]}
         components={components}
+        urlTransform={(url) => url}
       >
         {trimmed}
       </ReactMarkdown>
