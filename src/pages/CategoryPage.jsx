@@ -1,17 +1,155 @@
 import React from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
+import { usePosts } from '../features/posts/usePosts.js';
 import { Seo } from '../components/Seo.jsx';
+import { PostCardHorizontal } from '../components/cards/PostCardHorizontal.jsx';
+import { AnimatedCard } from '../components/cards/AnimatedCard.jsx';
+import { Pagination } from '../components/ui/Pagination.jsx';
+import { SkeletonPostCard } from '../components/ui/Skeleton.jsx';
+import { EmptyState } from '../components/ui/EmptyState.jsx';
+import { ErrorState } from '../components/ui/ErrorState.jsx';
+import { SITE_CONFIG } from '../config/site.js';
 
 export default function CategoryPage() {
   const { name } = useParams();
+  const [searchParams] = useSearchParams();
+  const pageParam = parseInt(searchParams.get('page') || '1', 10);
+  const currentPage = isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
+
+  const categoryName = name ? name.charAt(0).toUpperCase() + name.slice(1).toLowerCase() : '';
+
+  const { data, isLoading, isError, refetch } = usePosts({
+    category: name,
+    page: currentPage,
+    limit: 6,
+  });
+
+  const posts = data?.posts || [];
+  const pagination = data?.pagination || { page: 1, limit: 6, total: 0, totalPages: 1 };
+  const { totalPages, total } = pagination;
+
+  const isOutOfRange = !isLoading && totalPages > 0 && currentPage > totalPages;
+
   return (
-    <div className="py-20 text-center space-y-4">
-      <Seo title={`Department / ${name}`} />
-      <span className="font-mono text-xs uppercase tracking-meta text-accent">DEPARTMENT</span>
-      <h1 className="type-article-title text-ink">Category: {name}</h1>
-      <p className="font-mono text-xs text-ink-soft uppercase tracking-meta">
-        [Scheduled for stage 2]
-      </p>
+    <div className="py-8 space-y-12">
+      <Seo
+        title={`${categoryName} — Department Archive`}
+        description={`Read essays, dispatches, and criticism in the ${categoryName} department.`}
+      />
+
+      {/* Typographic Header */}
+      <header className="pb-6 border-b border-rule">
+        <span className="font-mono text-xs uppercase tracking-meta text-accent">
+          DEPARTMENT ARCHIVE
+        </span>
+        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 mt-1">
+          <h1 className="type-lead-headline text-ink">
+            Category / {categoryName}
+          </h1>
+          <span className="font-mono text-xs uppercase tracking-meta text-ink-soft">
+            {isLoading ? 'INDEXING...' : `${total} ${total === 1 ? 'story' : 'stories'}`}
+          </span>
+        </div>
+      </header>
+
+      {/* Loading Skeleton */}
+      {isLoading && (
+        <div className="space-y-6">
+          <SkeletonPostCard variant="horizontal" />
+          <SkeletonPostCard variant="horizontal" />
+          <SkeletonPostCard variant="horizontal" />
+        </div>
+      )}
+
+      {/* Error State */}
+      {isError && (
+        <ErrorState
+          title="Department Unavailable"
+          message={`Unable to retrieve stories filed under ${categoryName}.`}
+          onRetry={refetch}
+        />
+      )}
+
+      {/* Out of Range Friendly State */}
+      {isOutOfRange && (
+        <div className="py-16 text-center space-y-4 border border-rule bg-paper-2 p-8 rounded-[2px] max-w-lg mx-auto">
+          <span className="font-mono text-xs uppercase tracking-meta text-destructive">
+            OUT OF BOUNDS
+          </span>
+          <h2 className="font-display font-bold text-2xl text-ink">
+            Page {currentPage} Does Not Exist
+          </h2>
+          <p className="font-serif italic text-sm text-ink-soft">
+            This department currently contains {totalPages} pages of stories.
+          </p>
+          <div className="pt-2 flex justify-center gap-3">
+            <Link
+              to={`/category/${name}`}
+              className="px-4 py-2 bg-ink text-paper font-mono text-xs uppercase tracking-meta hover:bg-ink-soft transition-colors rounded-[2px]"
+            >
+              Return to Page 01
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!isLoading && !isError && !isOutOfRange && posts.length === 0 && (
+        <EmptyState
+          title={`No stories in ${categoryName}`}
+          message="No published dispatches have been catalogued under this department yet."
+          actionText="Explore All Stories"
+          actionHref="/"
+        />
+      )}
+
+      {/* Stories List with Sidebar Filters */}
+      {!isLoading && !isError && !isOutOfRange && posts.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+          {/* Main Column: Horizontal Story Cards */}
+          <div className="lg:col-span-8 divide-y divide-rule">
+            {posts.map((post, idx) => (
+              <AnimatedCard key={post.id} index={idx}>
+                <PostCardHorizontal post={post} />
+              </AnimatedCard>
+            ))}
+
+            {/* Pagination */}
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+            />
+          </div>
+
+          {/* Side Column: Other Departments Directory */}
+          <aside className="lg:col-span-4 lg:pl-6 lg:border-l lg:border-rule space-y-8">
+            <div className="bg-paper-2 p-5 border border-rule rounded-[2px] space-y-4">
+              <h3 className="font-mono text-xs uppercase tracking-meta text-ink font-semibold">
+                All Departments
+              </h3>
+              <ul className="space-y-2.5 font-mono text-xs uppercase tracking-meta">
+                {SITE_CONFIG.categories.map((cat) => (
+                  <li key={cat.slug} className="flex items-center justify-between">
+                    <Link
+                      to={`/category/${cat.slug}`}
+                      className={`transition-colors ${
+                        cat.slug.toLowerCase() === name?.toLowerCase()
+                          ? 'text-accent font-bold'
+                          : 'text-ink-soft hover:text-ink'
+                      }`}
+                    >
+                      {cat.name}
+                    </Link>
+                    {cat.slug.toLowerCase() === name?.toLowerCase() && (
+                      <span className="text-accent text-[0.625rem] font-bold">&bull; ACTIVE</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </aside>
+        </div>
+      )}
     </div>
   );
 }

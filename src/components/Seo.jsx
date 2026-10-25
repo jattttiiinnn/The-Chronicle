@@ -8,6 +8,7 @@ export function Seo({
   image = SITE_CONFIG.defaultCover,
   type = 'website',
   canonicalUrl,
+  preloadImage,
 }) {
   const fullTitle = title ? `${title} — ${SITE_NAME}` : `${SITE_NAME} — An Independent Journal`;
   const url = canonicalUrl || (typeof window !== 'undefined' ? window.location.href : '');
@@ -17,6 +18,7 @@ export function Seo({
       <title>{fullTitle}</title>
       <meta name="description" content={description} />
       {url && <link rel="canonical" href={url} />}
+      {preloadImage && <link rel="preload" as="image" href={preloadImage} />}
 
       {/* Open Graph */}
       <meta property="og:site_name" content={SITE_NAME} />

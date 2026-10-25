@@ -19,6 +19,10 @@ function setStorage(key, value) {
 }
 
 let posts = getStorage('posts', mockPosts);
+if (posts.length < mockPosts.length) {
+  posts = [...mockPosts];
+  setStorage('posts', posts);
+}
 let users = getStorage('users', mockUsers);
 let comments = getStorage('comments', mockComments);
 let bookmarks = getStorage('bookmarks', ['post_1']);
@@ -132,6 +136,13 @@ export async function handleMockRequest(config) {
         p.content.toLowerCase().includes(search)
       );
     }
+
+    // Sort by publication date descending
+    filtered.sort((a, b) => {
+      const dateA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+      const dateB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+      return dateB - dateA;
+    });
 
     const total = filtered.length;
     const totalPages = Math.ceil(total / limit) || 1;
