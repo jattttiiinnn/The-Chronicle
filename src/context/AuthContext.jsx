@@ -39,6 +39,29 @@ export function AuthProvider({ children }) {
     setOnUnauthorizedCallback(logout);
   }, [logout]);
 
+  // Refresh the cached profile on load, so server-side changes (a promotion to
+  // admin, a role change by another admin) appear without signing out and in.
+  useEffect(() => {
+    if (!token) return undefined;
+    let cancelled = false;
+
+    getMe()
+      .then((data) => {
+        if (cancelled || !data?.user) return;
+        setUser(data.user);
+        try {
+          localStorage.setItem('chronicle_user', JSON.stringify(data.user));
+        } catch (e) {}
+      })
+      .catch(() => {
+        // Keep the cached profile; the 401 handler deals with expired sessions.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
   const login = async (credentials) => {
     setLoading(true);
     try {

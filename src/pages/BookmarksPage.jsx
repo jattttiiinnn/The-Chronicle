@@ -18,7 +18,7 @@ export default function BookmarksPage() {
 
   return (
     <div className="py-8 space-y-10">
-      <Seo title="Saved Stories & Bookmarks" />
+      <Seo title="Saved Stories & Bookmarks" noindex={true} />
 
       {/* Header */}
       <header className="pb-6 border-b border-rule">

@@ -10,6 +10,7 @@ import { Pagination } from '../components/ui/Pagination.jsx';
 import { SkeletonPostCard } from '../components/ui/Skeleton.jsx';
 import { EmptyState } from '../components/ui/EmptyState.jsx';
 import { ErrorState } from '../components/ui/ErrorState.jsx';
+import { MastheadReveal } from '../components/editorial/MastheadReveal.jsx';
 import { SITE_CONFIG } from '../config/site.js';
 
 export default function HomePage() {
@@ -40,10 +41,14 @@ export default function HomePage() {
   const pagination = data?.pagination || { page: 1, limit: 8, total: 0, totalPages: 1 };
   const { totalPages, total } = pagination;
 
-  // Lead and secondary stories on first page
-  const leadPost = currentPage === 1 && posts.length > 0 ? posts[0] : null;
-  const secondaryPosts = currentPage === 1 && posts.length > 2 ? [posts[1], posts[2]] : [];
-  const feedPosts = currentPage === 1 ? posts.slice(3) : posts;
+  // Lead and secondary stories on first page (featured stories first, falling back to latest)
+  const featuredStories = posts.filter(p => p.featured);
+  const nonFeaturedStories = posts.filter(p => !p.featured);
+  const prioritizedStories = [...featuredStories, ...nonFeaturedStories];
+
+  const leadPost = currentPage === 1 && prioritizedStories.length > 0 ? prioritizedStories[0] : null;
+  const secondaryPosts = currentPage === 1 && prioritizedStories.length > 2 ? [prioritizedStories[1], prioritizedStories[2]] : [];
+  const feedPosts = currentPage === 1 ? prioritizedStories.slice(3) : posts;
 
   // Most Read stories (sorted by views descending from mock dataset)
   const mostReadPosts = [...posts]
@@ -55,6 +60,7 @@ export default function HomePage() {
 
   return (
     <div className="space-y-16 py-6">
+      <MastheadReveal />
       <Seo
         title={currentPage > 1 ? `Stories — Page ${currentPage}` : undefined}
         preloadImage={leadPost?.coverUrl || undefined}
@@ -62,12 +68,14 @@ export default function HomePage() {
 
       {/* Loading Skeleton State */}
       {isLoading && (
-        <div className="space-y-12">
-          <SkeletonPostCard variant="lead" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <SkeletonPostCard variant="standard" />
-            <SkeletonPostCard variant="standard" />
-          </div>
+        <div className="space-y-16">
+          <section className="space-y-12">
+            <SkeletonPostCard variant="lead" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <SkeletonPostCard variant="standard" />
+              <SkeletonPostCard variant="standard" />
+            </div>
+          </section>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pt-8 border-t border-rule">
             <div className="lg:col-span-8 space-y-8">
               <SkeletonPostCard variant="standard" />

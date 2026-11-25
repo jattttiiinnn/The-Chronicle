@@ -6,7 +6,7 @@ import { Button } from '../components/ui/Button.jsx';
 export function NotFoundPage() {
   return (
     <div className="py-20 sm:py-32 flex flex-col items-center justify-center text-center">
-      <Seo title="404 — Folio Not Found" />
+      <Seo title="404 — Folio Not Found" noindex={true} />
       <span className="font-mono text-xs uppercase tracking-meta text-accent mb-3">
         ERROR CODE 404 &bull; MISSING LEAF
       </span>

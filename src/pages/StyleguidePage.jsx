@@ -54,7 +54,7 @@ export function StyleguidePage() {
 
   return (
     <div className="py-8 space-y-16">
-      <Seo title="Design System & Styleguide" />
+      <Seo title="Design System & Styleguide" noindex={true} />
 
       {/* Header & Interactive Control Bar */}
       <section className="pb-8 border-b border-rule">

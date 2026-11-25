@@ -7,6 +7,20 @@ import { Input } from '../components/ui/Input.jsx';
 import { Button } from '../components/ui/Button.jsx';
 import { PullQuote } from '../components/editorial/PullQuote.jsx';
 import { useToast } from '../components/ui/Toast.jsx';
+import { cn } from '../utils/cn.js';
+
+const ROLE_OPTIONS = [
+  {
+    value: 'reader',
+    label: 'Reader',
+    description: 'Follow the journal, comment, like and save stories.'
+  },
+  {
+    value: 'author',
+    label: 'Writer',
+    description: 'Everything a reader can do, plus publish your own essays.'
+  }
+];
 
 export default function RegisterPage() {
   const { register: registerAuth } = useAuth();
@@ -15,6 +29,7 @@ export default function RegisterPage() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const [submitting, setSubmitting] = useState(false);
+  const [role, setRole] = useState('reader');
 
   const returnTarget = location.state?.from?.pathname || searchParams.get('from') || '/';
 
@@ -34,9 +49,13 @@ export default function RegisterPage() {
   const onSubmit = async (data) => {
     setSubmitting(true);
     try {
-      const res = await registerAuth(data);
-      toastSuccess(`Welcome to the readership, ${res.user.name}`);
-      navigate(returnTarget, { replace: true });
+      const res = await registerAuth({ ...data, role });
+      toastSuccess(
+        role === 'author'
+          ? `Welcome to the writing desk, ${res.user.name}`
+          : `Welcome to the readership, ${res.user.name}`
+      );
+      navigate(role === 'author' ? '/dashboard' : returnTarget, { replace: true });
     } catch (err) {
       toastError(err.response?.data?.message || 'Registration failed. Please check form inputs.');
     } finally {
@@ -46,12 +65,12 @@ export default function RegisterPage() {
 
   return (
     <div className="py-12 md:py-20">
-      <Seo title="Register — Readers Circle" />
+      <Seo title="Register — Join the Journal" noindex={true} />
       <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-12 items-center">
         {/* Editorial Left Column */}
         <div className="md:col-span-6 space-y-4 pr-0 md:pr-6 border-b md:border-b-0 md:border-r border-rule pb-8 md:pb-0">
           <span className="font-mono text-xs uppercase tracking-meta text-accent">
-            JOIN THE READERSHIP
+            JOIN THE JOURNAL
           </span>
           <h1 className="font-display font-black text-3xl sm:text-4xl text-ink">
             A Society of Quiet Attention
@@ -101,14 +120,57 @@ export default function RegisterPage() {
             />
 
             <Input
-              label="Reader Bio (Optional)"
+              label="Bio (Optional)"
               placeholder="Architectural observer, bibliophile..."
               {...register('bio')}
             />
 
+            <fieldset>
+              <legend className="block font-mono text-[0.6875rem] uppercase tracking-meta text-ink-soft mb-2">
+                I am joining as
+              </legend>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {ROLE_OPTIONS.map((option) => {
+                  const selected = role === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setRole(option.value)}
+                      aria-pressed={selected}
+                      className={cn(
+                        'text-left p-3 border rounded-[2px] transition-colors',
+                        selected
+                          ? 'border-accent bg-paper-2'
+                          : 'border-rule hover:border-ink'
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'block font-mono text-xs uppercase tracking-meta font-semibold mb-1',
+                          selected ? 'text-accent' : 'text-ink'
+                        )}
+                      >
+                        {option.label}
+                      </span>
+                      <span className="block text-xs text-ink-soft leading-snug">
+                        {option.description}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+
             <div className="pt-2">
               <Button type="submit" variant="solid" className="w-full" disabled={submitting}>
-                {submitting ? 'Creating Reader Account...' : 'Register'}
+                {submitting
+                  ? role === 'author'
+                    ? 'Creating Writer Account...'
+                    : 'Creating Reader Account...'
+                  : role === 'author'
+                    ? 'Register as Writer'
+                    : 'Register as Reader'}
               </Button>
             </div>
           </form>

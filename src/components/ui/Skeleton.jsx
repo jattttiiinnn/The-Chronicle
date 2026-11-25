@@ -13,11 +13,11 @@ export function Skeleton({ className = '', ...props }) {
 export function SkeletonPostCard({ variant = 'standard' }) {
   if (variant === 'lead') {
     return (
-      <div className="flex flex-col gap-4 pb-8 border-b border-rule">
-        <Skeleton className="w-full aspect-[16/9]" />
-        <Skeleton className="h-4 w-24" />
-        <Skeleton className="h-10 w-4/5" />
-        <Skeleton className="h-6 w-full" />
+      <div className="flex flex-col pb-8 border-b border-rule">
+        <Skeleton className="w-full aspect-[16/9] mb-6" />
+        <Skeleton className="h-3.5 w-24 mb-2" />
+        <Skeleton className="h-10 w-4/5 mb-4" />
+        <Skeleton className="h-6 w-full mb-4" />
         <Skeleton className="h-4 w-40" />
       </div>
     );

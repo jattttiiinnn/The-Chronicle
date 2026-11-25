@@ -8,6 +8,12 @@ export function PostCardStandard({ post }) {
   const readingTime = getReadingTime(post.content || post.excerpt || '');
   const primaryCategory = post.categories?.[0] || 'ESSAYS';
 
+  const getSrcSet = (url) => {
+    if (!url || !url.includes('images.unsplash.com')) return undefined;
+    const base = url.split('?')[0];
+    return `${base}?auto=format&fit=crop&w=480&q=75 480w, ${base}?auto=format&fit=crop&w=800&q=80 800w, ${base}?auto=format&fit=crop&w=1200&q=80 1200w`;
+  };
+
   return (
     <article className="group flex flex-col pb-6 border-b border-rule h-full">
       {/* Cover Image Frame */}
@@ -16,10 +22,13 @@ export function PostCardStandard({ post }) {
           <Link to={`/posts/${post.slug}`} tabIndex={-1}>
             <img
               src={post.coverUrl}
+              srcSet={getSrcSet(post.coverUrl)}
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 640px"
               alt={post.title}
               width={640}
               height={360}
               loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.03]"
             />
           </Link>

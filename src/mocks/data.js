@@ -37,6 +37,14 @@ export const mockUsers = [
     role: "reader",
     bio: "Architectural historian and avid reader of mid-century monographs.",
     avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80"
+  },
+  {
+    id: "usr_priya",
+    name: "Priya Sharma",
+    email: "priya.sharma@example.com",
+    role: "reader",
+    bio: "Independent researcher studying computational linguistics and editorial design history.",
+    avatarUrl: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80"
   }
 ];
 
@@ -1056,5 +1064,23 @@ export const mockComments = [
     body: "This comment is awaiting moderation to verify approval states.",
     isApproved: false,
     createdAt: "2026-10-24T18:20:00.000Z"
+  },
+  {
+    id: "cmt_5",
+    postId: "post_1",
+    userId: "usr_priya",
+    parentId: null,
+    body: "Evaluating editorial security: <script>alert('xss-admin')</script><img src=x onerror=alert('xss-img')>[Injected link](javascript:alert('xss-link')) with **bold typography**.",
+    isApproved: false,
+    createdAt: "2026-10-25T09:30:00.000Z"
+  },
+  {
+    id: "cmt_6",
+    postId: "post_2",
+    userId: "usr_reader",
+    parentId: null,
+    body: "A standalone comment without any nested replies for testing clean deletion.",
+    isApproved: true,
+    createdAt: "2026-10-25T14:10:00.000Z"
   }
 ];

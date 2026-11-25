@@ -7,6 +7,15 @@ import { Input } from '../components/ui/Input.jsx';
 import { Button } from '../components/ui/Button.jsx';
 import { PullQuote } from '../components/editorial/PullQuote.jsx';
 import { useToast } from '../components/ui/Toast.jsx';
+import { isMockMode } from '../api/client.js';
+
+// Seeded demo accounts (see server/seed.js) used by the development shortcuts.
+const DEV_ACCOUNTS = {
+  admin: 'eleanor.vance@chronicle.press',
+  author: 'julian.thorne@chronicle.press',
+  reader: 'clara.reader@example.com'
+};
+const DEV_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD || 'password123';
 
 export default function LoginPage() {
   const { login, switchMockRole } = useAuth();
@@ -43,15 +52,30 @@ export default function LoginPage() {
     }
   };
 
-  const handleDevQuickLogin = (role) => {
-    switchMockRole(role);
-    toastSuccess(`Switched session to ${role}`);
-    navigate(returnTarget, { replace: true });
+  const handleDevQuickLogin = async (role) => {
+    if (isMockMode) {
+      switchMockRole(role);
+      toastSuccess(`Switched session to ${role}`);
+      navigate(returnTarget, { replace: true });
+      return;
+    }
+
+    // Live API: sign in for real so the JWT is accepted by the backend.
+    setSubmitting(true);
+    try {
+      const res = await login({ email: DEV_ACCOUNTS[role], password: DEV_PASSWORD });
+      toastSuccess(`Signed in as ${res.user.name}`);
+      navigate(returnTarget, { replace: true });
+    } catch (err) {
+      toastError(err.response?.data?.message || 'Dev sign-in failed. Run "npm run seed" first.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="py-12 md:py-20">
-      <Seo title="Sign In — Readers & Contributors" />
+      <Seo title="Sign In — Readers & Contributors" noindex={true} />
       <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-12 items-center">
         {/* Editorial Left Column */}
         <div className="md:col-span-6 space-y-4 pr-0 md:pr-6 border-b md:border-b-0 md:border-r border-rule pb-8 md:pb-0">
@@ -136,7 +160,7 @@ export default function LoginPage() {
 
           <div className="pt-2 text-center">
             <Link to="/register" className="font-mono text-xs text-accent hover:underline uppercase tracking-meta">
-              Don't have an account? Register as reader &rarr;
+              Don't have an account? Join as reader or writer &rarr;
             </Link>
           </div>
         </div>

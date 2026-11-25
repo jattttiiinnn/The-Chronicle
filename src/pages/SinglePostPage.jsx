@@ -114,6 +114,8 @@ export default function SinglePostPage() {
         description={post.excerpt}
         image={post.coverUrl || undefined}
         type="article"
+        publishedTime={post.publishedAt || post.publishAt || post.createdAt}
+        author={post.author?.name}
         preloadImage={post.coverUrl || undefined}
       />
 
@@ -175,10 +177,18 @@ export default function SinglePostPage() {
           <div className="w-full aspect-[16/9] overflow-hidden bg-paper-2 border border-rule">
             <img
               src={post.coverUrl}
+              srcSet={
+                post.coverUrl.includes('images.unsplash.com')
+                  ? `${post.coverUrl.split('?')[0]}?auto=format&fit=crop&w=480&q=75 480w, ${post.coverUrl.split('?')[0]}?auto=format&fit=crop&w=800&q=80 800w, ${post.coverUrl.split('?')[0]}?auto=format&fit=crop&w=1200&q=80 1200w`
+                  : undefined
+              }
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 90vw, 1200px"
               alt={post.title}
               width={1200}
               height={675}
               loading="eager"
+              fetchPriority="high"
+              decoding="async"
               className="w-full h-full object-cover"
             />
           </div>

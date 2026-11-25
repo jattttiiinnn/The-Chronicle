@@ -2,7 +2,10 @@ import axios from 'axios';
 import { handleMockRequest } from '../mocks/handlers.js';
 
 const baseURL = import.meta.env.VITE_API_URL || '';
-export const isMockMode = !baseURL;
+// The real backend is the default. An empty VITE_API_URL means same-origin
+// requests (Vite proxy locally, Vercel in production). Mocks are opt-in only:
+// set VITE_API_MODE=mock to use the in-browser fake API.
+export const isMockMode = import.meta.env.VITE_API_MODE === 'mock' && !baseURL;
 
 export const apiClient = axios.create({
   baseURL,

@@ -1,9 +1,35 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
+import 'highlight.js/styles/github.css';
 import rehypeHighlight from 'rehype-highlight';
+import js from 'highlight.js/lib/languages/javascript';
+import ts from 'highlight.js/lib/languages/typescript';
+import css from 'highlight.js/lib/languages/css';
+import xml from 'highlight.js/lib/languages/xml';
+import python from 'highlight.js/lib/languages/python';
+import bash from 'highlight.js/lib/languages/bash';
+import json from 'highlight.js/lib/languages/json';
+import markdown from 'highlight.js/lib/languages/markdown';
 import { slugifyHeading } from '../../utils/toc.js';
 import { sanitizeUrl } from '../../utils/sanitize.js';
 import { cn } from '../../utils/cn.js';
+
+const selectedLanguages = {
+  javascript: js,
+  js,
+  typescript: ts,
+  ts,
+  css,
+  html: xml,
+  xml,
+  python,
+  py: python,
+  bash,
+  sh: bash,
+  json,
+  markdown,
+  md: markdown
+};
 
 export function MarkdownRenderer({ content = '', headings = [] }) {
   // Check if content starts with a heading or image
@@ -161,7 +187,7 @@ export function MarkdownRenderer({ content = '', headings = [] }) {
     },
 
     // Images: Explicit dimensions & sanitized source
-    img: ({ node, src, alt, ...props }) => {
+    img: ({ node, src, alt, width, height, ...props }) => {
       const safeSrc = sanitizeUrl(src);
       if (safeSrc.startsWith('#blocked')) {
         return null;
@@ -172,8 +198,11 @@ export function MarkdownRenderer({ content = '', headings = [] }) {
           <img
             src={safeSrc}
             alt={alt || 'Article illustration'}
+            width={width || 1200}
+            height={height || 675}
             loading="lazy"
-            className="w-full h-auto object-cover border border-rule"
+            decoding="async"
+            className="w-full h-auto object-cover border border-rule aspect-[16/9]"
             {...props}
           />
           {alt && (
@@ -196,7 +225,7 @@ export function MarkdownRenderer({ content = '', headings = [] }) {
         Raw HTML tags in content will be treated as literal escaped text by react-markdown 
       */}
       <ReactMarkdown
-        rehypePlugins={[rehypeHighlight]}
+        rehypePlugins={[[rehypeHighlight, { languages: selectedLanguages }]]}
         components={components}
         urlTransform={(url) => url}
       >

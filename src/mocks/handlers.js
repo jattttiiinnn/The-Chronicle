@@ -18,7 +18,7 @@ function setStorage(key, value) {
   } catch (e) {}
 }
 
-const MOCK_VERSION = 'v5_stage3_longform_800';
+const MOCK_VERSION = 'v6_stage6_admin_panel';
 try {
   const storedVersion = localStorage.getItem(STORAGE_PREFIX + 'version');
   if (storedVersion !== MOCK_VERSION) {
@@ -60,8 +60,10 @@ export async function handleMockRequest(config) {
 
   // Throttle simulation support
   const throttleMs = parseInt(mergedParams.get('_throttle') || '0', 10);
-  const latency = throttleMs > 0 ? throttleMs : 120;
-  await new Promise(resolve => setTimeout(resolve, latency));
+  const latency = throttleMs > 0 ? throttleMs : (import.meta.env?.PROD ? 0 : 20);
+  if (latency > 0) {
+    await new Promise(resolve => setTimeout(resolve, latency));
+  }
 
   // Simulated error support
   if (mergedParams.get('_error') === 'true' || config.headers?.['X-Mock-Error'] === 'true') {
@@ -129,7 +131,7 @@ export async function handleMockRequest(config) {
       id: `usr_${Date.now()}`,
       name: body.name || 'New Reader',
       email: body.email,
-      role: 'reader',
+      role: body.role === 'author' ? 'author' : 'reader',
       bio: body.bio || '',
       avatarUrl: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80`
     };
@@ -203,8 +205,12 @@ export async function handleMockRequest(config) {
         return dateA - dateB;
       });
     } else {
-      // Default: newest first
+      // Default: featured first on public home page, then newest first
       filtered.sort((a, b) => {
+        if (!authorId && !category && !tag && !search) {
+          if (a.featured && !b.featured) return -1;
+          if (!a.featured && b.featured) return 1;
+        }
         const dateA = new Date(a.publishedAt || a.publishAt || a.createdAt || 0).getTime();
         const dateB = new Date(b.publishedAt || b.publishAt || b.createdAt || 0).getTime();
         return dateB - dateA;
@@ -478,61 +484,284 @@ export async function handleMockRequest(config) {
     }, 201);
   }
 
-  // DELETE /api/comments/:id
-  const deleteCommentMatch = pathname.match(/^\/api\/comments\/([^/]+)$/);
+  // DELETE /api/comments/:id or DELETE /api/admin/comments/:id
+  const deleteCommentMatch = pathname.match(/^\/api\/(?:admin\/)?comments\/([^/]+)$/);
   if (deleteCommentMatch && method === 'DELETE') {
     const commentId = deleteCommentMatch[1];
     const comment = comments.find(c => c.id === commentId);
     if (!comment) return errorResponse('Comment not found', 404);
     if (!currentUser || (currentUser.role !== 'admin' && comment.userId !== currentUser.id)) {
-      return errorResponse('Forbidden', 403);
+      return errorResponse('Forbidden: You do not have permission to delete this comment.', 403);
     }
-    comments = comments.filter(c => c.id !== commentId && c.parentId !== commentId);
+    const hasReplies = comments.some(c => c.parentId === commentId && !c.isDeleted);
+    if (hasReplies) {
+      comment.isDeleted = true;
+      comment.body = '[This comment was removed by a moderator]';
+    } else {
+      comments = comments.filter(c => c.id !== commentId);
+    }
     setStorage('comments', comments);
-    return jsonResponse({ success: true, id: commentId });
+    return jsonResponse({ success: true, id: commentId, tombstoned: hasReplies });
   }
 
-  // PATCH /api/admin/comments/:id/approve (TODO backend fallback)
-  const approveCommentMatch = pathname.match(/^\/api\/admin\/comments\/([^/]+)\/approve$/);
-  if (approveCommentMatch && method === 'PATCH') {
-    if (!currentUser || currentUser.role !== 'admin') return errorResponse('Admin only', 403);
-    const commentId = approveCommentMatch[1];
-    const comment = comments.find(c => c.id === commentId);
-    if (!comment) return errorResponse('Comment not found', 404);
-    comment.isApproved = true;
-    setStorage('comments', comments);
-    return jsonResponse(comment);
+  // =========================================================================
+  // --- ADMIN ENDPOINTS GATEWAY SECURITY (Section 2, 7 & 9.5) ---
+  // =========================================================================
+  if (pathname.startsWith('/api/admin/')) {
+    if (!token || !currentUser) {
+      return errorResponse('Authentication required.', 401);
+    }
+    if (currentUser.role !== 'admin') {
+      return errorResponse('Forbidden: Administrator privileges required.', 403);
+    }
   }
 
-  // --- ADMIN USERS ENDPOINTS ---
-  // GET /api/admin/users
+  // --- 1. ADMIN USERS ENDPOINTS ---
+  // GET /api/admin/users?q=&role=&page=&limit=
   if (pathname === '/api/admin/users' && method === 'GET') {
-    if (!currentUser || currentUser.role !== 'admin') return errorResponse('Admin only', 403);
-    return jsonResponse({ users });
+    const q = mergedParams.get('q')?.toLowerCase().trim() || '';
+    const roleFilter = mergedParams.get('role')?.toLowerCase().trim() || '';
+    const page = parseInt(mergedParams.get('page') || '1', 10);
+    const limit = parseInt(mergedParams.get('limit') || '10', 10);
+
+    let filtered = [...users];
+
+    if (roleFilter && roleFilter !== 'all') {
+      filtered = filtered.filter(u => (u.role || '').toLowerCase() === roleFilter);
+    }
+
+    if (q) {
+      filtered = filtered.filter(u =>
+        (u.name && u.name.toLowerCase().includes(q)) ||
+        (u.email && u.email.toLowerCase().includes(q))
+      );
+    }
+
+    const total = filtered.length;
+    const totalPages = Math.ceil(total / limit) || 1;
+    const startIndex = (page - 1) * limit;
+    const paginated = filtered.slice(startIndex, startIndex + limit).map(u => ({
+      ...u,
+      postCount: posts.filter(p => p.authorId === u.id).length
+    }));
+
+    return jsonResponse({
+      users: paginated,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages
+      }
+    });
   }
 
   // PATCH /api/admin/users/:id/role
   const userRoleMatch = pathname.match(/^\/api\/admin\/users\/([^/]+)\/role$/);
   if (userRoleMatch && method === 'PATCH') {
-    if (!currentUser || currentUser.role !== 'admin') return errorResponse('Admin only', 403);
     const userId = userRoleMatch[1];
     const body = typeof config.data === 'string' ? JSON.parse(config.data || '{}') : config.data || {};
-    const user = users.find(u => u.id === userId);
-    if (!user) return errorResponse('User not found', 404);
-    user.role = body.role;
+    const targetUser = users.find(u => u.id === userId);
+    if (!targetUser) return errorResponse('User not found', 404);
+
+    // Safeguard 1: Administrator cannot change their own role
+    if (currentUser.id === userId) {
+      return errorResponse('Administrators cannot alter their own role permissions.', 403);
+    }
+
+    // Role Enum Validation
+    const allowedRoles = ['reader', 'author', 'admin'];
+    if (!body.role || !allowedRoles.includes(body.role)) {
+      return errorResponse('Invalid role: Must be reader, author, or admin.', 400);
+    }
+
+    // Safeguard 2: Last remaining administrator cannot be demoted
+    if (targetUser.role === 'admin' && body.role !== 'admin') {
+      const adminCount = users.filter(u => u.role === 'admin').length;
+      if (adminCount <= 1) {
+        return errorResponse('Operation denied: Cannot demote the last remaining administrator.', 409);
+      }
+    }
+
+    targetUser.role = body.role;
     setStorage('users', users);
-    return jsonResponse(user);
+    return jsonResponse(targetUser);
   }
 
-  // PATCH /api/admin/posts/:id/featured (TODO backend fallback)
+  // --- 2. ADMIN COMMENTS ENDPOINTS ---
+  // GET /api/admin/comments?status=&q=&page=&limit=
+  if (pathname === '/api/admin/comments' && method === 'GET') {
+    const status = mergedParams.get('status')?.toLowerCase().trim() || 'pending';
+    const q = mergedParams.get('q')?.toLowerCase().trim() || '';
+    const page = parseInt(mergedParams.get('page') || '1', 10);
+    const limit = parseInt(mergedParams.get('limit') || '10', 10);
+
+    const pendingCount = comments.filter(c => !c.isApproved && !c.isDeleted).length;
+    const approvedCount = comments.filter(c => c.isApproved && !c.isDeleted).length;
+    const allCount = comments.length;
+
+    let filtered = [...comments];
+
+    if (status === 'pending') {
+      filtered = filtered.filter(c => !c.isApproved && !c.isDeleted);
+    } else if (status === 'approved') {
+      filtered = filtered.filter(c => c.isApproved && !c.isDeleted);
+    }
+
+    if (q) {
+      filtered = filtered.filter(c => {
+        const author = users.find(u => u.id === c.userId);
+        const bodyMatch = c.body && c.body.toLowerCase().includes(q);
+        const authorMatch = author && author.name && author.name.toLowerCase().includes(q);
+        return Boolean(bodyMatch || authorMatch);
+      });
+    }
+
+    filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const total = filtered.length;
+    const totalPages = Math.ceil(total / limit) || 1;
+    const startIndex = (page - 1) * limit;
+    const paginated = filtered.slice(startIndex, startIndex + limit).map(c => {
+      const author = users.find(u => u.id === c.userId) || {
+        id: c.userId,
+        name: 'Anonymous Reader',
+        role: 'reader'
+      };
+      const post = posts.find(p => p.id === c.postId) || {
+        id: c.postId,
+        title: 'Unknown Story',
+        slug: 'unknown'
+      };
+      return {
+        ...c,
+        author,
+        post: {
+          id: post.id,
+          title: post.title,
+          slug: post.slug
+        }
+      };
+    });
+
+    return jsonResponse({
+      comments: paginated,
+      counts: {
+        pending: pendingCount,
+        approved: approvedCount,
+        all: allCount
+      },
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages
+      }
+    });
+  }
+
+  // PATCH /api/admin/comments/:id/approve
+  const approveCommentMatch = pathname.match(/^\/api\/admin\/comments\/([^/]+)\/approve$/);
+  if (approveCommentMatch && method === 'PATCH') {
+    const commentId = approveCommentMatch[1];
+    const comment = comments.find(c => c.id === commentId);
+    if (!comment) return errorResponse('Comment not found', 404);
+    comment.isApproved = true;
+    comment.isDeleted = false;
+    setStorage('comments', comments);
+    return jsonResponse(comment);
+  }
+
+  // --- 3. ADMIN POSTS ENDPOINTS ---
+  // GET /api/admin/posts?status=&category=&featured=&q=&page=&limit=
+  if (pathname === '/api/admin/posts' && method === 'GET') {
+    const status = mergedParams.get('status')?.toLowerCase().trim() || 'all';
+    const category = mergedParams.get('category')?.toLowerCase().trim() || '';
+    const featured = mergedParams.get('featured');
+    const q = mergedParams.get('q')?.toLowerCase().trim() || '';
+    const page = parseInt(mergedParams.get('page') || '1', 10);
+    const limit = parseInt(mergedParams.get('limit') || '10', 10);
+
+    let filtered = [...posts];
+
+    if (status && status !== 'all') {
+      filtered = filtered.filter(p => p.status === status);
+    }
+
+    if (category && category !== 'all') {
+      filtered = filtered.filter(p => p.categories && p.categories.some(c => c.toLowerCase() === category));
+    }
+
+    if (featured === 'true') {
+      filtered = filtered.filter(p => p.featured === true);
+    } else if (featured === 'false') {
+      filtered = filtered.filter(p => !p.featured);
+    }
+
+    if (q) {
+      filtered = filtered.filter(p => p.title && p.title.toLowerCase().includes(q));
+    }
+
+    // Sort newest first
+    filtered.sort((a, b) => {
+      const dateA = new Date(a.publishedAt || a.publishAt || a.createdAt || 0).getTime();
+      const dateB = new Date(b.publishedAt || b.publishAt || b.createdAt || 0).getTime();
+      return dateB - dateA;
+    });
+
+    const total = filtered.length;
+    const totalPages = Math.ceil(total / limit) || 1;
+    const startIndex = (page - 1) * limit;
+    const paginated = filtered.slice(startIndex, startIndex + limit).map(p => {
+      const author = users.find(u => u.id === p.authorId) || null;
+      return {
+        ...p,
+        author
+      };
+    });
+
+    return jsonResponse({
+      posts: paginated,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages
+      },
+      counts: {
+        all: posts.length,
+        published: posts.filter(p => p.status === 'published').length,
+        draft: posts.filter(p => p.status === 'draft').length,
+        scheduled: posts.filter(p => p.status === 'scheduled').length,
+        featured: posts.filter(p => p.featured === true).length
+      }
+    });
+  }
+
+  // PATCH /api/admin/posts/:id/featured
   const featuredPostMatch = pathname.match(/^\/api\/admin\/posts\/([^/]+)\/featured$/);
   if (featuredPostMatch && method === 'PATCH') {
-    if (!currentUser || currentUser.role !== 'admin') return errorResponse('Admin only', 403);
     const postId = featuredPostMatch[1];
     const post = posts.find(p => p.id === postId);
     if (!post) return errorResponse('Post not found', 404);
+
     const body = typeof config.data === 'string' ? JSON.parse(config.data || '{}') : config.data || {};
-    post.featured = typeof body.featured === 'boolean' ? body.featured : !post.featured;
+    const targetFeatured = typeof body.featured === 'boolean' ? body.featured : !post.featured;
+
+    // Rule: Only published posts can be featured
+    if (targetFeatured && post.status !== 'published') {
+      return errorResponse('Only published stories can be featured on the cover.', 400);
+    }
+
+    // Rule: Limit featured posts to 3
+    if (targetFeatured) {
+      const currentFeaturedCount = posts.filter(p => p.featured && p.id !== postId).length;
+      if (currentFeaturedCount >= 3) {
+        return errorResponse('Maximum of 3 featured stories reached. Unfeature another story first.', 400);
+      }
+    }
+
+    post.featured = targetFeatured;
     setStorage('posts', posts);
     return jsonResponse(post);
   }

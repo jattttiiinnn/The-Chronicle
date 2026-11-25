@@ -43,8 +43,11 @@ export function ToastProvider({ children }) {
     addToast({ type: 'info', message, title });
   }, [addToast]);
 
+  // Some screens destructure `{ toast }`; expose the same helpers under that name too.
+  const toast = { success, error, info };
+
   return (
-    <ToastContext.Provider value={{ addToast, removeToast, success, error, info }}>
+    <ToastContext.Provider value={{ addToast, removeToast, success, error, info, toast }}>
       {children}
       {/* Toast container */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none">

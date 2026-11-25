@@ -76,6 +76,7 @@ export default function SearchPage() {
       <Seo
         title={urlQuery ? `Search: "${urlQuery}"` : 'Index & Search'}
         description="Search across essays, cultural commentary, and architectural inquiries in The Chronicle."
+        noindex={true}
       />
 
       {/* Search Header & Input */}

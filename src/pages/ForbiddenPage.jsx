@@ -6,7 +6,7 @@ import { Button } from '../components/ui/Button.jsx';
 export function ForbiddenPage() {
   return (
     <div className="py-20 sm:py-32 flex flex-col items-center justify-center text-center">
-      <Seo title="403 — Unauthorized Archive Access" />
+      <Seo title="403 — Unauthorized Archive Access" noindex={true} />
       <span className="font-mono text-xs uppercase tracking-meta text-destructive mb-3">
         ERROR CODE 403 &bull; RESTRICTED FOLIO
       </span>

@@ -1,17 +1,16 @@
-@import "@fontsource/playfair-display/700.css";
-@import "@fontsource/playfair-display/900.css";
-@import "@fontsource/playfair-display/700-italic.css";
-@import "@fontsource/playfair-display/900-italic.css";
-@import "@fontsource/source-serif-4/400.css";
-@import "@fontsource/source-serif-4/600.css";
-@import "@fontsource/source-serif-4/400-italic.css";
-@import "@fontsource/source-serif-4/600-italic.css";
-@import "@fontsource/inter/400.css";
-@import "@fontsource/inter/500.css";
-@import "@fontsource/inter/600.css";
-@import "@fontsource/jetbrains-mono/400.css";
-@import "@fontsource/jetbrains-mono/500.css";
-@import "highlight.js/styles/github.css";
+@import "@fontsource/playfair-display/latin-700.css";
+@import "@fontsource/playfair-display/latin-900.css";
+@import "@fontsource/playfair-display/latin-700-italic.css";
+@import "@fontsource/playfair-display/latin-900-italic.css";
+@import "@fontsource/source-serif-4/latin-400.css";
+@import "@fontsource/source-serif-4/latin-600.css";
+@import "@fontsource/source-serif-4/latin-400-italic.css";
+@import "@fontsource/source-serif-4/latin-600-italic.css";
+@import "@fontsource/inter/latin-400.css";
+@import "@fontsource/inter/latin-500.css";
+@import "@fontsource/inter/latin-600.css";
+@import "@fontsource/jetbrains-mono/latin-400.css";
+@import "@fontsource/jetbrains-mono/latin-500.css";
 
 @tailwind base;
 @tailwind components;
@@ -175,4 +174,25 @@
 .hover-underline-animation:hover::after {
   transform: scaleX(1);
   transform-origin: bottom left;
+}
+
+/* Masthead Reveal Keyframes (Hardware Accelerated Compositor Animation) */
+@keyframes masthead-reveal-left {
+  0% { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-100%, 0, 0); }
+}
+
+@keyframes masthead-reveal-right {
+  0% { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(100%, 0, 0); }
+}
+
+.animate-reveal-left {
+  animation: masthead-reveal-left 1.05s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform;
+}
+
+.animate-reveal-right {
+  animation: masthead-reveal-right 1.05s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform;
 }

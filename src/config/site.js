@@ -18,3 +18,5 @@ export const SITE_CONFIG = {
     rss: '/feed.xml'
   }
 };
+
+export const CATEGORIES = SITE_CONFIG.categories;

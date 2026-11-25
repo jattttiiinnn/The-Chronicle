@@ -87,7 +87,7 @@ export default function DashboardPostsPage() {
 
   return (
     <div className="space-y-6">
-      <Seo title="Author Stories — Back of House" />
+      <Seo title="Author Stories — Back of House" noindex={true} />
 
       {/* Top Header & New Story Action */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-rule">

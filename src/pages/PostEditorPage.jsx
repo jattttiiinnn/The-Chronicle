@@ -164,7 +164,7 @@ export default function PostEditorPage() {
   };
 
   const autoSaveEnabled = !isEditing || formValues.status === 'draft';
-  const { saveStatus, lastSavedAt, error: autoSaveError, saveNow } = useAutoSave({
+  const { saveStatus, setSaveStatus, lastSavedAt, error: autoSaveError, saveNow } = useAutoSave({
     onSave: handleAutoSave,
     data: formValues,
     isDirty,
@@ -403,7 +403,7 @@ export default function PostEditorPage() {
     if (status === 403) {
       return (
         <div className="py-20 text-center space-y-4 max-w-md mx-auto">
-          <Seo title="403 Forbidden — Chronicle" />
+          <Seo title="403 Forbidden — Chronicle" noindex={true} />
           <span className="font-mono text-xs uppercase tracking-meta text-destructive">ACCESS RESTRICTED</span>
           <h1 className="font-display font-bold text-3xl text-ink">403 — Forbidden</h1>
           <p className="font-sans text-sm text-ink-soft">
@@ -417,7 +417,7 @@ export default function PostEditorPage() {
     }
     return (
       <div className="py-20 text-center space-y-4 max-w-md mx-auto">
-        <Seo title="404 Not Found — Chronicle" />
+        <Seo title="404 Not Found — Chronicle" noindex={true} />
         <span className="font-mono text-xs uppercase tracking-meta text-ink-soft">STORY NOT FOUND</span>
         <h1 className="font-display font-bold text-3xl text-ink">404 — Not Found</h1>
         <p className="font-sans text-sm text-ink-soft">
@@ -483,7 +483,10 @@ export default function PostEditorPage() {
 
   return (
     <div className="space-y-6">
-      <Seo title={isEditing ? `Edit: ${formValues.title || 'Story'} — Chronicle` : 'New Manuscript — Chronicle'} />
+      <Seo
+        title={isEditing ? `Edit: ${formValues.title || 'Story'} — Chronicle` : 'New Manuscript — Chronicle'}
+        noindex={true}
+      />
 
       {/* Screen reader live announcements for auto-save and errors */}
       <div role="status" aria-live="polite" className="sr-only">

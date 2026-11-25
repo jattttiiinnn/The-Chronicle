@@ -6,3 +6,5 @@ dist-ssr
 .DS_Store
 screenshots/
 scripts/
+*-results.json
+lighthouse-*.json

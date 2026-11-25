@@ -10,6 +10,12 @@ export function DashboardLayout() {
 
   return (
     <div className="min-h-screen bg-paper text-ink flex flex-col font-sans">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-ink focus:text-paper focus:font-mono focus:text-xs focus:rounded-[2px] focus:shadow-md focus:outline-none focus:ring-2 focus:ring-accent"
+      >
+        Skip to main content
+      </a>
       {/* Dense Top Header */}
       <header className="border-b border-rule bg-paper">
         <div className="max-w-site mx-auto px-4 sm:px-6 h-12 flex items-center justify-between font-mono text-xs uppercase tracking-meta">
@@ -53,7 +59,7 @@ export function DashboardLayout() {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-site w-full mx-auto px-4 sm:px-6 py-8">
+      <main id="main-content" tabIndex={-1} className="flex-1 max-w-site w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 outline-none">
         <Suspense fallback={<Skeleton className="h-64 w-full" />}>
           <Outlet />
         </Suspense>

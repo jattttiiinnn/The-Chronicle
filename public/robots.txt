@@ -1,4 +1,16 @@
 User-agent: *
 Allow: /
+Allow: /posts/
+Allow: /category/
+Allow: /tag/
+Disallow: /dashboard
+Disallow: /dashboard/
+Disallow: /admin
+Disallow: /admin/
+Disallow: /login
+Disallow: /register
+Disallow: /bookmarks
+Disallow: /search
+Disallow: /styleguide
 
-Sitemap: /sitemap.xml
+Sitemap: https://chronicle.press/sitemap.xml
