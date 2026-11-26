@@ -2,6 +2,9 @@
   "name": "chronicle-blog",
   "private": true,
   "version": "1.0.0",
+  "engines": {
+    "node": ">=20.12.0"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,8 +13,9 @@
     "seed:fresh": "node server/seed.js --fresh",
     "promote": "node server/promote.js",
     "passwd": "node server/passwd.js",
-    "build:sitemap": "node scripts/generate-sitemap.js",
-    "build": "node scripts/generate-sitemap.js && vite build",
+    "build:sitemap": "node server/generate-sitemap.js",
+    "build": "node server/generate-sitemap.js && vite build",
+    "start": "node server/index.js",
     "preview": "vite preview"
   },
   "dependencies": {

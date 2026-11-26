@@ -1,0 +1,29 @@
+# Render blueprint for The Chronicle.
+#
+# One web service does everything: Express serves /api/*, the built SPA in
+# dist/, and the crawler preview tags. No separate static site or API host,
+# so there is no CORS setup and no VITE_API_URL to configure.
+#
+# Usage: push this repo to GitHub → Render dashboard → New → Blueprint →
+# select the repo. Render reads this file and prompts for MONGODB_URI.
+services:
+  - type: web
+    name: chronicle
+    runtime: node
+    plan: free
+    region: singapore
+    branch: main
+    # `npm ci` needs package-lock.json, and `npm run build` runs Vite from
+    # devDependencies — so do NOT set NODE_ENV=production here, it would make
+    # npm skip the dev install and break the build.
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    # Fails the deploy early if the Atlas connection cannot be established.
+    healthCheckPath: /api/health
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB
+        value: chronicle
+      - key: JWT_SECRET
+        generateValue: true

@@ -4,9 +4,20 @@ import path from 'path';
 
 const BOT_USER_AGENTS = /bot|googlebot|crawler|spider|robot|crawling|facebookexternalhit|twitterbot|slackbot|whatsapp|telegrambot|linkedinbot|discordbot|applebot/i;
 const SITE_NAME = 'THE CHRONICLE';
-const SITE_URL = 'https://chronicle.press';
+const DEFAULT_SITE_URL = 'https://chronicle.press';
+
+// Prefer an explicit SITE_URL, otherwise describe the origin that was actually
+// requested so previews and canonicals match the deployed host.
+function siteUrl(req) {
+  const configured = process.env.SITE_URL;
+  if (configured) return configured.replace(/\/$/, '');
+  const host = req.headers['host'];
+  if (host) return `${req.protocol || 'https'}://${host}`;
+  return DEFAULT_SITE_URL;
+}
 
 export default async function handler(req, res) {
+  const SITE_URL = siteUrl(req);
   const userAgent = req.headers['user-agent'] || '';
   const isBot = BOT_USER_AGENTS.test(userAgent);
   const slug = req.query.slug || (req.url || '').split('/').pop()?.split('?')[0];
@@ -16,11 +27,12 @@ export default async function handler(req, res) {
     return res.redirect(302, `/posts/${slug}`);
   }
 
-  let post = null;
+  // The Express route (server/og.js) can hand over an already-loaded post.
+  let post = req.ogPost || null;
 
   // 1. Try real API if configured
   const apiUrl = process.env.VITE_API_URL || process.env.API_URL;
-  if (apiUrl) {
+  if (!post && apiUrl) {
     try {
       const response = await fetch(`${apiUrl}/api/posts/${slug}`);
       if (response.ok) {

@@ -13,7 +13,7 @@ Authentication is real: bcrypt password hashes, JWTs, and server-enforced roles.
 ## 1. Quick Start
 
 ### Prerequisites
-- Node.js `v18+` (tested on Node `v24.19.0`)
+- Node.js `20.12+` (tested on Node `v24.19.0`; Render runs 22)
 - A free MongoDB Atlas cluster (instructions below)
 
 ### Installation
@@ -47,13 +47,14 @@ The design system styleguide lives at `http://localhost:5173/styleguide`.
 | `npm run passwd -- <email> "<password>"` | Reset an account's password |
 | `npm run build` | Regenerate the sitemap, then build into `dist/` |
 | `npm run build:sitemap` | Sitemap only |
-| `npm run preview` | Serve the production build on `http://localhost:4173` |
+| `npm start` | Run the API **and** serve `dist/` from one process (production/Render) |
+| `npm run preview` | Serve the production build on `http://localhost:4173` (Vite only, no API) |
 
 ---
 
 ## 3. Database Setup (MongoDB Atlas)
 
-1. Create a free **M0** cluster at [MongoDB Atlas](https://www.mongodb.com/cloud/atlas), add a database user, and allow access from `0.0.0.0/0` (Vercel functions have no fixed IP).
+1. Create a free **M0** cluster at [MongoDB Atlas](https://www.mongodb.com/cloud/atlas), add a database user, and allow access from `0.0.0.0/0` (Render and Vercel have no fixed outbound IP).
 2. Copy `.env.example` to `.env` and set `MONGODB_URI` (the *Drivers* connection string) and a long random `JWT_SECRET`.
 3. Seed the demo content: `npm run seed`.
 4. Start both servers as shown above.
@@ -98,7 +99,11 @@ npm run passwd -- you@example.com "a new password"
 
 | Path | Purpose |
 |---|---|
-| [`server/app.js`](server/app.js) | Express app: body parsing, DB connection, route mounts, error shapes |
+| [`server/app.js`](server/app.js) | Express app: body parsing, DB connection, route mounts, static SPA, error shapes |
+| [`server/index.js`](server/index.js) | Production entry point (`npm start`) — binds `0.0.0.0:$PORT`, graceful shutdown |
+| [`server/dev.js`](server/dev.js) | Local API entry point (`npm run api`) — API only, Vite serves the UI |
+| [`server/og.js`](server/og.js) | Crawler `GET /posts/:slug` preview tags for social cards and search bots |
+| [`server/generate-sitemap.js`](server/generate-sitemap.js) | Build-time `public/sitemap.xml` generator |
 | [`server/db.js`](server/db.js) | Loads `.env`, caches the Atlas connection across serverless invocations |
 | [`server/models.js`](server/models.js) | Mongoose schemas (`User`, `Post`, `Comment`, `Upload`) with indexed fields |
 | [`server/routes/`](server/routes) | `auth`, `posts`, `comments`, `bookmarks`, `admin`, `uploads` |
@@ -106,7 +111,7 @@ npm run passwd -- you@example.com "a new password"
 | [`server/seed.js`](server/seed.js) | Loads `src/mocks/data.js` into MongoDB |
 | [`server/promote.js`](server/promote.js) | CLI role management |
 | [`server/passwd.js`](server/passwd.js) | CLI password reset |
-| [`api/index.js`](api/index.js) | Vercel serverless entry wrapping the same Express app |
+| [`api/index.js`](api/index.js) | Vercel serverless entry wrapping the same Express app (unused on Render) |
 | [`vite.config.js`](vite.config.js) | Dev proxy `/api` → `localhost:5000` |
 
 Ids keep the original mock format (`usr_…`, `post_…`, `cmt_…`) so references between seeded documents stay stable.
@@ -196,33 +201,61 @@ Base path `/api`. Requests with a body are JSON. Errors are always `{ message }`
 | `MONGODB_DB` | server | `chronicle` | Database name |
 | `JWT_SECRET` | server | — | Long random string used to sign session tokens |
 | `SEED_PASSWORD` | server | `password123` | Password given to every seeded account |
-| `PORT` | server | `5000` | API port for `npm run api` |
-| `VITE_API_URL` | client | *empty* | Blank means same-origin (Vite proxy locally, deployed domain in production). Set only when the API lives on another origin. |
+| `PORT` | server | `5000` | Port to listen on. Render assigns one automatically |
+| `SITE_URL` | server | *request origin* | Canonical origin used in the sitemap and social preview tags. Set it to your public Render URL |
+| `VITE_API_URL` | client | *empty* | Blank means same-origin (Vite proxy locally, the Express server on Render). Set only when the API lives on another origin. |
 | `VITE_API_MODE` | client | `live` | `live` calls the real API. `mock` swaps in the in-browser fake API with no server or database. |
 
 A template is provided in [.env.example](.env.example). Client variables are baked in at build time, so redeploy after changing them.
 
 ---
 
-## 8. Deployment (Vercel)
+## 8. Deployment (Render)
 
-[`vercel.json`](vercel.json) is configured with:
-1. `/api/*` rewritten to the Express serverless function ([`api/index.js`](api/index.js)); `/api/og-meta` keeps its own crawler function.
-2. SPA rewrites routing remaining non-asset requests to `/index.html`.
-3. Immutable caching headers for hashed assets under `/assets/*`.
+Render runs **one Node web service** that serves everything: `/api/*` from Express, the built SPA from `dist/`, and crawler preview tags. Because the frontend and API share an origin there is no CORS configuration and no `VITE_API_URL` to set.
 
-Set `MONGODB_URI`, `JWT_SECRET` and `MONGODB_DB` in the Vercel project (Production and Preview), and allow `0.0.0.0/0` in Atlas Network Access. Add `API_URL` (the deployed origin) if you want `/api/og-meta` to resolve titles from the live database instead of the cached snapshot.
+### Deploy with the blueprint
 
-The deployment itself has not been verified end to end — after the first deploy, confirm the `/api/*` rewrite, a real login, and that `/api/og-meta` still returns preview tags.
+1. Push this repository to GitHub.
+2. In Render: **New → Blueprint**, pick the repo. [`render.yaml`](render.yaml) is detected and describes the service (free plan, `npm ci && npm run build`, `npm start`, health check on `/api/health`).
+3. When prompted for `MONGODB_URI`, paste your Atlas connection string. Render generates `JWT_SECRET` itself and sets `MONGODB_DB=chronicle`.
+4. In Atlas → **Network Access**, allow `0.0.0.0/0`. Render's outbound IPs are not fixed.
+5. Wait for the deploy to go live, then open the service URL.
+
+### Deploy manually (no blueprint)
+
+| Setting | Value |
+|---|---|
+| Runtime | Node |
+| Build command | `npm ci && npm run build` |
+| Start command | `npm start` |
+| Health check path | `/api/health` |
+
+Environment variables: `MONGODB_URI`, `JWT_SECRET`, `MONGODB_DB=chronicle`, and `SITE_URL` set to the service URL (used by the sitemap and social tags). Do not set `PORT` — Render injects it. Do not set `NODE_ENV=production`, because the build needs Vite from `devDependencies`.
+
+### After the first deploy
+
+- **Seed the database once.** The free M0 cluster is shared with your local `.env`, so if you already ran `npm run seed` locally there is nothing to do. Otherwise open the service's **Shell** tab and run `npm run seed`, or from your machine: `MONGODB_URI="<atlas uri>" npm run seed`.
+- **Create your admin account.** Register at `/register`, then either run `npm run promote -- you@example.com` in the Render Shell, or from your machine: `MONGODB_URI="<atlas uri>" npm run promote -- you@example.com`.
+- **Check `SITE_URL`.** Without it, sitemap entries fall back to `https://chronicle.press` and preview tags follow the request host.
+- **If the deploy fails at the health check**, Atlas is refusing the connection. The log line `[health] database connection failed: … isn't whitelisted` is the tell — fix Network Access, then **Manual Deploy → Deploy latest commit**.
+
+### Free-plan behaviour
+
+An idle free instance sleeps after ~15 minutes and needs ~50 seconds to wake on the next request. The first visit after a period of inactivity will feel slow; that is the instance booting, not a bug. Instance-local state is discarded on restart, which is fine because all data lives in Atlas.
+
+### Keeping Vercel support
+
+[`vercel.json`](vercel.json), [`api/index.js`](api/index.js) and [`middleware.js`](middleware.js) still describe a Vercel deployment (`/api/*` rewrite, SPA fallback, edge crawler redirect). They are ignored by Render. If you deploy to Vercel instead, set `MONGODB_URI`, `JWT_SECRET`, `MONGODB_DB` and `API_URL` there.
 
 ---
 
 ## 9. Known Gaps
 
-- No rate limiting, no security headers, and CORS currently allows every origin.
+- No rate limiting and no security headers. CORS is still open, though a single-service Render deploy does not need it.
 - No password change in the UI and no forgot-password email — both are terminal commands.
 - No email verification, so anyone can register with any address.
 - M0 clusters have backups disabled; a bad `seed:fresh` is unrecoverable.
 - Uploads live inside MongoDB documents rather than object storage.
-- The build-time sitemap ([`scripts/generate-sitemap.js`](scripts/generate-sitemap.js)) still reads `src/mocks/data.js`, and `public/meta-cache.json` is a static snapshot — stories published from the app are not reflected without regenerating.
+- The build-time sitemap ([`server/generate-sitemap.js`](server/generate-sitemap.js)) still reads `src/mocks/data.js`, and `public/meta-cache.json` is a static snapshot — stories published from the app are not reflected in `sitemap.xml` until the build reruns. Crawler preview tags are unaffected on Render: they query MongoDB at request time.
 - No automated test suite; the backend was verified with one-off HTTP checks.
